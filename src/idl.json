@@ -1,0 +1,51 @@
+{
+    "version": "0.1.0",
+    "name": "twitter",
+    "instructions": [
+      {
+        "name": "initialize",
+        "accounts": [
+          {
+            "name": "tweet",
+            "isMut": true,
+            "isSigner": false
+          },
+          {
+            "name": "user",
+            "isMut": true,
+            "isSigner": true
+          },
+          {
+            "name": "systemProgram",
+            "isMut": false,
+            "isSigner": false
+          }
+        ],
+        "args": [
+          {
+            "name": "content",
+            "type": "string"
+          }
+        ]
+      }
+    ],
+    "accounts": [
+      {
+        "name": "tweet",
+        "type": {
+          "kind": "struct",
+          "fields": [
+            {
+              "name": "author",
+              "type": "publicKey"
+            },
+            {
+              "name": "content",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    ]
+  }
+  
