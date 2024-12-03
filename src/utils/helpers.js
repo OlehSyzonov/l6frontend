@@ -1,3 +1,4 @@
+// src/utils/helpers.js
 import { PublicKey } from '@solana/web3.js';
 import crypto from 'crypto';
 
@@ -24,14 +25,12 @@ export const getReactionAddress = (author, tweet, programID) => {
 };
 
 export const getCommentAddress = (commentContent, author, parentTweet, programID) => {
-  const hexString = crypto.createHash('sha256').update(commentContent, 'utf-8').digest('hex');
-  const contentSeed = Uint8Array.from(Buffer.from(hexString, 'hex'));
-
+  const hash = crypto.createHash('sha256').update(commentContent, 'utf-8').digest();
   return PublicKey.findProgramAddressSync(
     [
       Buffer.from('COMMENT_SEED'),
       author.toBuffer(),
-      contentSeed,
+      hash,
       parentTweet.toBuffer()
     ],
     programID
