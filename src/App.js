@@ -1,66 +1,97 @@
 import React, { useState, useEffect } from 'react';
-import { web3 } from '@coral-xyz/anchor';
-import { getProvider, getProgram } from './utils/solana';
-import TweetList from './components/TweetList';
-import { getTweetAddress } from './utils/helpers';
+import './App.css';
+import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
+import { Program, AnchorProvider, web3 } from '@coral-xyz/anchor';
+import idl from './idl.json';
+import { WalletNotConnectedError } from '@solana/wallet-adapter-base';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
-const App = () => {
+const programID = new PublicKey('Je3bmRaREtmhnbE6PJ3KP5aZZm15aeUwqQHSyXGwRPd');
+const network = clusterApiUrl('devnet');
+const opts = {
+  preflightCommitment: 'processed'
+};
+
+const TWEET_SEED = "TWEET_SEED";
+
+function App() {
+  const [program, setProgram] = useState(null);
+  const [provider, setProvider] = useState(null);
   const [tweets, setTweets] = useState([]);
-  const [tweetContent, setTweetContent] = useState('');
-  const [walletAddress, setWalletAddress] = useState(null);
+  const [topic, setTopic] = useState('');
+  const [content, setContent] = useState('');
 
   useEffect(() => {
-    const loadTweets = async () => {
-      const program = getProgram();
-      const tweetAccounts = await program.account.tweet.all();
-      setTweets(tweetAccounts);
-    };
-    loadTweets();
+    initializeProgram();
   }, []);
 
-  const connectWallet = async () => {
-    const provider = getProvider();
-    if (provider.wallet) {
-      setWalletAddress(provider.wallet.publicKey.toString());
-    }
+  const getProvider = () => {
+    const connection = new Connection(network, opts.preflightCommitment);
+    const provider = new AnchorProvider(connection, window.solana, opts);
+    setProvider(provider);
+    return provider;
   };
 
-  const sendTweet = async () => {
-    const program = getProgram();
+  const initializeProgram = async () => {
     const provider = getProvider();
-    const [tweetAccount] = getTweetAddress(tweetContent, provider.wallet.publicKey, program.programId);
+    const program = new Program(idl, programID, provider);
+    setProgram(program);
+    loadTweets(program);
+  };
 
-    await program.rpc.initialize(tweetContent, {
-      accounts: {
-        tweet: tweetAccount,
-        user: provider.wallet.publicKey,
-        systemProgram: web3.SystemProgram.programId
-      }
-    });
-
-    setTweetContent('');
+  const loadTweets = async (program) => {
     const tweetAccounts = await program.account.tweet.all();
     setTweets(tweetAccounts);
   };
 
+  const createTweet = async () => {
+    if (!provider) {
+      throw new WalletNotConnectedError();
+    }
+    const [tweetPDA, bump] = await PublicKey.findProgramAddress(
+      [
+        Buffer.from(topic),
+        Buffer.from(TWEET_SEED),
+        provider.wallet.publicKey.toBuffer()
+      ],
+      programID
+    );
+
+    await program.methods.initialize(topic, content).accounts({
+      tweetAuthority: provider.wallet.publicKey,
+      tweet: tweetPDA,
+      systemProgram: web3.SystemProgram.programId
+    }).rpc();
+
+    loadTweets(program);
+  };
+
   return (
-    <div>
-      <h1>Twitter on Solana</h1>
-      {!walletAddress ? (
-        <button onClick={connectWallet}>Connect Wallet</button>
-      ) : (
-        <div>
-          <input
-            value={tweetContent}
-            onChange={(e) => setTweetContent(e.target.value)}
-            placeholder="What's happening?"
-          />
-          <button onClick={sendTweet}>Tweet</button>
-          <TweetList tweets={tweets} />
-        </div>
-      )}
+    <div className="App">
+      <WalletMultiButton />
+      <h1>Twitter dApp on Solana</h1>
+      <input
+        value={topic}
+        onChange={(e) => setTopic(e.target.value)}
+        placeholder="Tweet topic"
+      />
+      <input
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="Tweet content"
+      />
+      <button onClick={createTweet}>Create Tweet</button>
+      <div>
+        {tweets.map((tweet, index) => (
+          <div key={index}>
+            <p>Topic: {tweet.account.topic.toString()}</p>
+            <p>Content: {tweet.account.content.toString()}</p>
+            <small>by {tweet.account.tweet_author.toString()}</small>
+          </div>
+        ))}
+      </div>
     </div>
   );
-};
+}
 
 export default App;
